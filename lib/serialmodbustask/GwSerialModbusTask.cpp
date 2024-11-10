@@ -1,116 +1,6 @@
 #include "GwSerialModbusTask.h"
 #include "WindFunctions.h"
 
-class GwSerialModbusTaskStream : public Stream
-{
-private:
-    GwSerialModbusTask *serial;
-    bool partialWrites;
-
-public:
-    GwSerialModbusTaskStream(GwSerialModbusTask *serial, bool partialWrites = false)
-    {
-        this->serial = serial;
-        this->partialWrites = partialWrites;
-    }
-    virtual int available()
-    {
-        if (!serial->isInitialized())
-            return 0;
-        if (!serial->readBuffer)
-            return 0;
-        return serial->readBuffer->usedSpace();
-    }
-    virtual int read()
-    {
-        if (!serial->isInitialized())
-            return -1;
-        if (!serial->readBuffer)
-            return -1;
-        return serial->readBuffer->read();
-    }
-    virtual int peek()
-    {
-        if (!serial->isInitialized())
-            return -1;
-        if (!serial->readBuffer)
-            return -1;
-        return serial->readBuffer->peek();
-    }
-    virtual void flush() {};
-    virtual size_t write(uint8_t v)
-    {
-        if (!serial->isInitialized())
-            return 0;
-        size_t rt = serial->buffer->addData(&v, 1, partialWrites);
-        return rt;
-    }
-    virtual size_t write(const uint8_t *buffer, size_t size)
-    {
-        if (!serial->isInitialized())
-            return 0;
-        size_t rt = serial->buffer->addData(buffer, size, partialWrites);
-        return rt;
-    }
-};
-
-GwSerialModbusTask::GwSerialModbusTask(GwLog *logger, Stream *s, int id, bool allowRead) : serial(s)
-{
-    LOG_DEBUG(GwLog::DEBUG, "creating GwSerialModbusTask %p id %d", this, id);
-    this->id = id;
-    this->logger = logger;
-    String bufName = "Ser(";
-    bufName += String(id);
-    bufName += ")";
-    this->buffer = new GwBuffer(logger, GwBuffer::TX_BUFFER_SIZE, bufName + "wr");
-    this->allowRead = allowRead;
-    if (allowRead)
-    {
-        this->readBuffer = new GwBuffer(logger, GwBuffer::RX_BUFFER_SIZE, bufName + "rd");
-    }
-    buffer->reset("init");
-    initialized = true;
-}
-GwSerialModbusTask::~GwSerialModbusTask()
-{
-    delete buffer;
-    if (readBuffer)
-        delete readBuffer;
-}
-
-bool GwSerialModbusTask::isInitialized() { return initialized; }
-size_t GwSerialModbusTask::enqueue(const uint8_t *data, size_t len, bool partial)
-{
-    if (!isInitialized())
-        return 0;
-    return buffer->addData(data, len, partial);
-}
-GwBuffer::WriteStatus GwSerialModbusTask::write()
-{
-    if (!isInitialized())
-        return GwBuffer::ERROR;
-    size_t numWrite = serial->availableForWrite();
-    size_t rt = buffer->fetchData(numWrite, [](uint8_t *buffer, size_t len, void *p)
-                                  { return ((GwSerialModbusTask *)p)->serial->write(buffer, len); }, this);
-    if (rt != 0)
-    {
-        LOG_DEBUG(GwLog::DEBUG + 1, "Serial %d write %d", id, rt);
-    }
-    return buffer->usedSpace() ? GwBuffer::AGAIN : GwBuffer::OK;
-}
-size_t GwSerialModbusTask::sendToClients(const char *buf, int sourceId, bool partial)
-{
-    if (sourceId == id)
-        return 0;
-    size_t len = strlen(buf);
-    size_t enqueued = enqueue((const uint8_t *)buf, len, partial);
-    if (enqueued != len && !partial)
-    {
-        LOG_DEBUG(GwLog::DEBUG, "GwSerialModbusTask overflow on channel %d", id);
-        overflows++;
-    }
-    return enqueued;
-}
 void GwSerialModbusTask::loop(bool handleRead, bool handleWrite)
 {
     write();
@@ -118,16 +8,16 @@ void GwSerialModbusTask::loop(bool handleRead, bool handleWrite)
         return;
     if (!handleRead)
         return;
-    size_t available = serial->available();
+    size_t available = stream->available();
 
     if (allowRead)
     {
         size_t rd = readBuffer->fillData(MAX_NMEA0183_MSG_LEN, [](uint8_t *buffer, size_t len, void *p) -> size_t
                                          {
                                              GwSerialModbusTask *task = (GwSerialModbusTask *)p;
-                                             Stream *serial = task->serial;
+                                             Stream *stream = task->stream;
 
-                                             WindFunctions wind(serial, 1);
+                                             WindFunctions wind(stream, 1);
 
                                              // Read wind speed and direction using Modbus
                                              if (wind.readAll())
@@ -177,43 +67,8 @@ void GwSerialModbusTask::loop(bool handleRead, bool handleWrite)
         uint8_t buffer[10];
         if (available > 10)
             available = 10;
-        serial->readBytes(buffer, available);
+        stream->readBytes(buffer, available);
     }
-}
-void GwSerialModbusTask::readMessages(GwMessageFetcher *writer)
-{
-    if (!isInitialized())
-        return;
-    if (!allowRead)
-        return;
-    writer->handleBuffer(readBuffer);
-}
-
-bool GwSerialModbusTask::flush(long max)
-{
-    if (!isInitialized())
-        return false;
-    if (!availableWrite)
-    {
-        if (serial->availableForWrite() < 1)
-        {
-            return false;
-        }
-        availableWrite = true;
-    }
-    auto start = millis();
-    while (millis() < (start + max))
-    {
-        if (write() != GwBuffer::AGAIN)
-            return true;
-        vTaskDelay(1);
-    }
-    availableWrite = (serial->availableForWrite() > 0);
-    return false;
-}
-Stream *GwSerialModbusTask::getStream(bool partialWrite)
-{
-    return new GwSerialModbusTaskStream(this, partialWrite);
 }
 
 bool GwSerialModbusTask::createMWVMessage(double windSpeed, double windAngle, tNMEA0183Msg &msg)
