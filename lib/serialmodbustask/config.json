@@ -1,0 +1,14 @@
+[
+    {
+        "name": "serialMode",
+        "label": "serial mode",
+        "type": "list",
+        "default": "nmea",
+        "list": [
+            "nmea",
+            "modbus"
+        ],
+        "description": "expect NMEA or Modbus data",
+        "category": "serial port"
+    }
+]
