@@ -7,6 +7,7 @@
 #include "GwSerial.h"
 #include "GwTcpClient.h"
 #include "GwUdpWriter.h"
+#include "GwUdpReader.h"
 class SerInit{
     public:
         int serial=-1;
@@ -260,7 +261,26 @@ static  ChannelParam channelParameters[]={
         .maxId=-1,
         .rxstatus=0,
         .txstatus=offsetof(GwApi::Status,GwApi::Status::udpwTx)
+    },
+    {
+        .id=UDPR_CHANNEL_ID,
+        .baud="",
+        .receive=GwConfigDefinitions::udprEnabled,
+        .send="",
+        .direction="",
+        .toN2K=GwConfigDefinitions::udprToN2k,
+        .readF=GwConfigDefinitions::udprReadFilter,
+        .writeF="",
+        .preventLog="",
+        .readAct="",
+        .writeAct="",
+        .sendSeasmart="",
+        .name="UDPReader",
+        .maxId=-1,
+        .rxstatus=offsetof(GwApi::Status,GwApi::Status::udprRx),
+        .txstatus=0
     }
+
 
 };
 
@@ -349,17 +369,20 @@ static GwChannel * createChannel(GwLog *logger, GwConfigHandler *config, int id,
         return nullptr;
     }
     GwChannel *channel = new GwChannel(logger, param->name,param->id,param->maxId);
+    bool sendSeaSmart=config->getBool(param->sendSeasmart);
+    bool readAct=config->getBool(param->readAct);
+    bool writeAct=config->getBool(param->writeAct);
     channel->setImpl(impl);
     channel->begin(
-        canRead || canWrite,
+        canRead || canWrite || readAct || writeAct|| sendSeaSmart,
         canWrite,
         canRead,
         config->getString(param->readF),
         config->getString(param->writeF),
-        config->getBool(param->sendSeasmart),
+        sendSeaSmart,
         config->getBool(param->toN2K),
-        config->getBool(param->readAct),
-        config->getBool(param->writeAct));
+        readAct,
+        writeAct);
     LOG_INFO("created channel %s",channel->toString().c_str());
     return channel;
 }
@@ -450,6 +473,12 @@ void GwChannelList::begin(bool fallbackSerial){
         GwUdpWriter *writer=new GwUdpWriter(config,logger,UDPW_CHANNEL_ID);
         writer->begin();
         addChannel(createChannel(logger,config,UDPW_CHANNEL_ID,writer));
+    }
+    //udp reader
+    if (config->getBool(GwConfigDefinitions::udprEnabled)){
+        GwUdpReader *reader=new GwUdpReader(config,logger,UDPR_CHANNEL_ID);
+        reader->begin();
+        addChannel(createChannel(logger,config,UDPR_CHANNEL_ID,reader));
     }
     logger->flush();
 }
