@@ -1,6 +1,8 @@
 #include "WindFunctions.h"
 #include <Arduino.h>
 
+WindFunctions *WindFunctions::instance = NULL;
+
 size_t WindFunctions::readN(uint8_t *buf, size_t len)
 {
   size_t offset = 0;
