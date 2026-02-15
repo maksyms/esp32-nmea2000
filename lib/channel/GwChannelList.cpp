@@ -334,12 +334,16 @@ static GwSerial * createSerialImpl(GwConfigHandler *config,GwLog *logger, int id
         case USB_CHANNEL_ID:
             serialStream=createSerial(streamLog,&USBSerial,param->id,type);
             break;
+#if SOC_UART_NUM > 1
         case SERIAL1_CHANNEL_ID:
             serialStream=createSerial(streamLog,&Serial1,param->id,type);
             break;
+#endif
+#if SOC_UART_NUM > 2
         case SERIAL2_CHANNEL_ID:
             serialStream=createSerial(streamLog,&Serial2,param->id,type);
             break;
+#endif
     }
     if (serialStream == nullptr){
         LOG_DEBUG(GwLog::ERROR,"invalid serial config with id %d",param->id);

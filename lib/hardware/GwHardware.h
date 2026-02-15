@@ -96,6 +96,16 @@
   #define USBSerial Serial
 #endif
 
+//Devkitm-C3
+#ifdef PLATFORM_BOARD_ESP32_C3_DEVKITM_1
+  #ifdef ARDUINO_USB_CDC_ON_BOOT
+    #if ARDUINO_USB_CDC_ON_BOOT == 1
+      #define USBSerial Serial
+    #endif
+  #endif
+#endif
+
+
 #ifdef BOARD_M5ATOM
 #define M5_CAN_KIT
 //150mA if we power from the bus

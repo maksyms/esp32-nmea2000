@@ -136,6 +136,11 @@ class SSISensor : public SensorTemplate<BUSTYPE,SensorBase::SPI>{
     
 };
 using SpiSensorList=SensorList;
+#define GWSPI_UNDEFINED -1
 #define GWSPI1_HOST SPI2_HOST
-#define GWSPI2_HOST SPI3_HOST
+#if SOC_SPI_PERIPH_NUM > 2
+ #define GWSPI2_HOST SPI3_HOST
+#else
+ #define GWSPI2_HOST GWSPI_UNDEFINED
+#endif
 #endif

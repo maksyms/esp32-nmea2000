@@ -18,8 +18,12 @@
 #include "GwTimer.h"
 #include "GwHardware.h"
 
+#if GWSPI1_HOST != GWSPI_UNDEFINED
 static SPIBus bus1(GWSPI1_HOST);
+#endif
+#if GWSPI2_HOST != GWSPI_UNDEFINED
 static SPIBus bus2(GWSPI2_HOST);
+#endif
 
 #ifdef GWSPI1_CLK
 static const int spi1clk=GWSPI1_CLK;
@@ -65,6 +69,7 @@ void runSpiTask(GwApi *api){
         if (bus == buses.end()){
             switch (busId)
             {
+#if GWSPI1_HOST != GWSPI_UNDEFINED
             case GWSPI1_HOST:
                 if (spi1clk < 0){
                     LOG_DEBUG(GwLog::ERROR,"SPI bus 1 not configured, cannot create %s",sensor->prefix.c_str());
@@ -75,6 +80,8 @@ void runSpiTask(GwApi *api){
                     }
                 }
                 break;
+#endif
+#if GWSPI2_HOST != GWSPI_UNDEFINED
             case GWSPI2_HOST:
                 if (spi2clk < 0){
                     LOG_DEBUG(GwLog::ERROR,"SPI bus 2 not configured, cannot create %s",sensor->prefix.c_str());
@@ -85,6 +92,7 @@ void runSpiTask(GwApi *api){
                     }
                 }
                 break;
+#endif
             default:
                 LOG_DEBUG(GwLog::ERROR,"invalid busid %d for %s",busId,sensor->prefix.c_str());
             }
